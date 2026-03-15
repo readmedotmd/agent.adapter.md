@@ -29,7 +29,7 @@ type mockAdapter struct {
 
 type permissionDecision struct {
 	toolCallID string
-	approved   bool
+	response   ApprovalResponse
 }
 
 func newMockAdapter() *mockAdapter {
@@ -201,9 +201,9 @@ func (m *mockAdapter) ResumeConversation(ctx context.Context, conversationID str
 
 // --- PermissionResponder ---
 
-func (m *mockAdapter) RespondPermission(ctx context.Context, toolCallID string, approved bool) error {
+func (m *mockAdapter) RespondPermission(ctx context.Context, toolCallID string, response ApprovalResponse) error {
 	select {
-	case m.permissionCh <- permissionDecision{toolCallID: toolCallID, approved: approved}:
+	case m.permissionCh <- permissionDecision{toolCallID: toolCallID, response: response}:
 		return nil
 	case <-ctx.Done():
 		return ctx.Err()

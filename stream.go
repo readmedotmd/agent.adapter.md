@@ -24,7 +24,7 @@ const (
 type StreamEventType int
 
 const (
-	EventToken             StreamEventType = iota
+	EventToken StreamEventType = iota
 	EventDone
 	EventError
 	EventToolUse
@@ -37,6 +37,13 @@ const (
 	EventFileChange        // agent created, edited, or deleted a file
 	EventSubAgent          // agent delegated to a sub-agent
 	EventCostUpdate        // token usage / cost update
+	EventCompactionBegin   // context compaction started
+	EventCompactionEnd     // context compaction finished
+	EventStepBegin         // new step started (multi-step tasks)
+	EventStepEnd           // step completed
+	EventToolInputStream   // streaming tool input (for large JSON args)
+	EventExternalToolCall  // external tool is being invoked
+	EventDisplayBlock      // rich display output (diffs, todos, etc.)
 )
 
 // TokenUsage reports token consumption and cost for a turn or session.
@@ -52,10 +59,10 @@ type TokenUsage struct {
 type FileChangeOp string
 
 const (
-	FileCreated  FileChangeOp = "created"
-	FileEdited   FileChangeOp = "edited"
-	FileDeleted  FileChangeOp = "deleted"
-	FileRenamed  FileChangeOp = "renamed"
+	FileCreated FileChangeOp = "created"
+	FileEdited  FileChangeOp = "edited"
+	FileDeleted FileChangeOp = "deleted"
+	FileRenamed FileChangeOp = "renamed"
 )
 
 // FileChange describes a file operation performed by the agent.
@@ -90,6 +97,59 @@ type SubAgentEvent struct {
 	Result    string
 }
 
+// CompactionInfo provides details about context compaction.
+type CompactionInfo struct {
+	Reason       string // e.g., "context_limit", "manual"
+	TokensBefore int
+	TokensAfter  int
+	Summary      string // summary of what was compacted
+}
+
+// StepInfo provides details about step lifecycle.
+type StepInfo struct {
+	StepNumber int
+	TotalSteps int // -1 if unknown
+}
+
+// DisplayBlockType identifies the type of rich display content.
+type DisplayBlockType string
+
+const (
+	DisplayBlockBrief   DisplayBlockType = "brief"
+	DisplayBlockDiff    DisplayBlockType = "diff"
+	DisplayBlockTodo    DisplayBlockType = "todo"
+	DisplayBlockShell   DisplayBlockType = "shell"
+	DisplayBlockUnknown DisplayBlockType = "unknown"
+)
+
+// TodoStatus represents the status of a todo item.
+type TodoStatus string
+
+const (
+	TodoStatusPending    TodoStatus = "pending"
+	TodoStatusInProgress TodoStatus = "in_progress"
+	TodoStatusDone       TodoStatus = "done"
+)
+
+// TodoItem represents a single todo item.
+type TodoItem struct {
+	Title  string
+	Status TodoStatus
+}
+
+// DisplayBlock represents rich output content from tools.
+type DisplayBlock struct {
+	Type     DisplayBlockType
+	Text     string     // For brief
+	Path     string     // For diff
+	OldText  string     // For diff
+	NewText  string     // For diff
+	Items    []TodoItem // For todo
+	Language string     // For shell
+	Command  string     // For shell
+	Data     map[string]any // For unknown/custom types
+}
+
 // StreamEvent represents a single event in the streaming response.
 type StreamEvent struct {
 	Type      StreamEventType
@@ -121,6 +181,15 @@ type StreamEvent struct {
 
 	// Cost / usage
 	Usage *TokenUsage
+
+	// Compaction
+	Compaction *CompactionInfo
+
+	// Step lifecycle
+	Step *StepInfo
+
+	// Display blocks for rich output
+	DisplayBlock *DisplayBlock
 
 	// Control flow
 	Error   error

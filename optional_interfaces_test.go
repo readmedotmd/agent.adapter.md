@@ -221,22 +221,32 @@ func TestPermissionResponder(t *testing.T) {
 
 	// Approve
 	go func() {
-		pr.RespondPermission(ctx, "tc-1", true)
+		pr.RespondPermission(ctx, "tc-1", ApprovalResponseApprove)
 	}()
 
 	decision := <-m.permissionCh
-	if decision.toolCallID != "tc-1" || !decision.approved {
+	if decision.toolCallID != "tc-1" || decision.response != ApprovalResponseApprove {
 		t.Errorf("expected approved tc-1, got %+v", decision)
 	}
 
-	// Deny
+	// Approve for session
 	go func() {
-		pr.RespondPermission(ctx, "tc-2", false)
+		pr.RespondPermission(ctx, "tc-2", ApprovalResponseApproveForSession)
 	}()
 
 	decision = <-m.permissionCh
-	if decision.toolCallID != "tc-2" || decision.approved {
-		t.Errorf("expected denied tc-2, got %+v", decision)
+	if decision.toolCallID != "tc-2" || decision.response != ApprovalResponseApproveForSession {
+		t.Errorf("expected approve-for-session tc-2, got %+v", decision)
+	}
+
+	// Reject
+	go func() {
+		pr.RespondPermission(ctx, "tc-3", ApprovalResponseReject)
+	}()
+
+	decision = <-m.permissionCh
+	if decision.toolCallID != "tc-3" || decision.response != ApprovalResponseReject {
+		t.Errorf("expected rejected tc-3, got %+v", decision)
 	}
 }
 
@@ -250,7 +260,7 @@ func TestPermissionResponderRespectsContext(t *testing.T) {
 		m.permissionCh <- permissionDecision{}
 	}
 
-	err := m.RespondPermission(ctx, "tc-1", true)
+	err := m.RespondPermission(ctx, "tc-1", ApprovalResponseApprove)
 	if err == nil {
 		t.Fatal("expected error from cancelled context")
 	}
@@ -365,7 +375,7 @@ func TestFullSendReceivePermissionCycle(t *testing.T) {
 		})
 		// Wait for permission response
 		decision := <-m.permissionCh
-		if decision.approved {
+		if decision.response == ApprovalResponseApprove || decision.response == ApprovalResponseApproveForSession {
 			m.emit(StreamEvent{Type: EventToolUse, ToolCallID: "tc-1", ToolName: "Bash", ToolStatus: ToolRunning})
 			m.emit(StreamEvent{Type: EventToolResult, ToolCallID: "tc-1", ToolOutput: "deleted 3 files", ToolStatus: ToolComplete})
 			m.emit(StreamEvent{Type: EventFileChange, FileChange: &FileChange{Op: FileDeleted, Path: "/tmp/old1.txt"}})
@@ -385,7 +395,7 @@ func TestFullSendReceivePermissionCycle(t *testing.T) {
 
 		// When we get a permission request, approve it
 		if ev.Type == EventPermissionRequest {
-			m.RespondPermission(ctx, ev.Permission.ToolCallID, true)
+			m.RespondPermission(ctx, ev.Permission.ToolCallID, ApprovalResponseApprove)
 		}
 
 		if ev.Type == EventFileChange && ev.FileChange.Op == FileDeleted {
