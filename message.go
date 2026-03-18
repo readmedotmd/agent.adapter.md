@@ -38,8 +38,12 @@ type ContentBlock struct {
 	Type     ContentType
 	Text     string
 	Language string // for ContentCode
-	Data     []byte // for binary content (images, files)
+	Data     []byte // for binary content (images, files) — inline
 	MimeType string
+	// ImageRef, when non-empty, indicates the image is stored externally in the
+	// imagestore rather than inlined in Data. The value is the image ID returned
+	// by imagestore.Store.Put. Only one of Data or ImageRef should be set.
+	ImageRef string
 	ToolCall *ToolCall
 }
 
